@@ -18,8 +18,7 @@
 	SOFTWARE.
 --]]
 
-local Module = CreateFrame("Frame", "Kkthnx_SimpleCopyChat")
-Module:Hide()
+local Module = CreateFrame("Frame")
 Module:RegisterEvent("PLAYER_LOGIN")
 
 local _G = _G
@@ -39,18 +38,16 @@ local frame
 local editBox
 
 -- RGBToHex
-function Module.RGBToHex(r, g, b)
-	if r then
-		if type(r) == "table" then
-			if r.r then
-				r, g, b = r.r, r.g, r.b
-			else
-				r, g, b = unpack(r)
-			end
+local function RGBToHex(r, g, b)
+	if type(r) == "table" then
+		if r.r then
+			r, g, b = r.r, r.g, r.b
+		else
+			r, g, b = unpack(r)
 		end
-
-		return string.format("|cff%02x%02x%02x", r * 255, g * 255, b * 255)
 	end
+
+	return string.format("|cff%02x%02x%02x", r * 255, g * 255, b * 255)
 end
 
 local function canChangeMessage(arg1, id)
@@ -64,15 +61,16 @@ local function isMessageProtected(msg)
 end
 
 local function replaceMessage(msg, r, g, b)
-	local hexRGB = Module.RGBToHex(r, g, b)
-	msg = string_gsub(msg, "|T(.-):.-|t", "%1")
-
-	return string.format("%s%s|r", hexRGB, msg)
+	local hexRGB = RGBToHex(r or 1, g or 1, b or 1)
+	msg = msg:gsub("|T(.-):.-|t", "")
+	msg = msg:gsub("|A(.-):.-|a", "")
+	return ("%s%s|r"):format(hexRGB, msg)
 end
 
 function Module:GetChatLines()
 	local index = 1
-	for i = 1, self:GetNumMessages() do
+	local numMessages = self:GetNumMessages()
+	for i = 1, numMessages do
 		local msg, r, g, b = self:GetMessageInfo(i)
 		if msg and not isMessageProtected(msg) then
 			r, g, b = r or 1, g or 1, b or 1
@@ -82,19 +80,25 @@ function Module:GetChatLines()
 		end
 	end
 
-	return index - 1
+	return table.concat(lines, "\n"), index - 1
 end
 
 function Module:ChatCopy_OnClick()
+	local chatframe = _G.SELECTED_DOCK_FRAME
 	if not frame:IsShown() then
-		local chatframe = _G.SELECTED_DOCK_FRAME
 		local _, fontSize = chatframe:GetFont()
 		FCF_SetChatWindowFontSize(chatframe, chatframe, 0.01)
 		PlaySound(21968)
 		frame:Show()
 
-		local lineCt = Module.GetChatLines(chatframe)
-		local text = table_concat(lines, "\n", 1, lineCt)
+		local lineCt = chatframe:GetNumMessages()
+		local text = ""
+		for i = 1, lineCt do
+			local msg, r, g, b = chatframe:GetMessageInfo(i)
+			if msg and not isMessageProtected(msg) then
+				text = text .. replaceMessage(msg, r, g, b) .. "\n"
+			end
+		end
 		FCF_SetChatWindowFontSize(chatframe, chatframe, fontSize)
 		editBox:SetText(text)
 	else
@@ -105,12 +109,11 @@ end
 function Module:ChatCopy_OnEnter()
 	UIFrameFadeIn(self, 0.25, self:GetAlpha(), 1)
 
-	local anchor, _, xoff, yoff = "ANCHOR_RIGHT", self:GetParent(), 10, 5
-	GameTooltip:SetOwner(self, anchor, xoff, yoff)
-	GameTooltip:ClearLines()
-	GameTooltip:AddLine("Simple Copy Chat")
-
-	GameTooltip:Show()
+	if not GameTooltip:IsForbidden() then
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT", 10, 5)
+		GameTooltip:SetText("Simple Copy Chat")
+		GameTooltip:Show()
+	end
 end
 
 function Module:ChatCopy_OnLeave()
@@ -120,6 +123,33 @@ function Module:ChatCopy_OnLeave()
 		GameTooltip:Hide()
 	end
 end
+
+local function CreateCopyButton(chatFrameID)
+	local chat = _G["ChatFrame" .. chatFrameID]
+	local copy = CreateFrame("Button", "Kkthnx_ChatCopyButton" .. chatFrameID, chat)
+	copy:SetPoint("BOTTOMRIGHT", 22, -4)
+	copy:SetSize(16, 16)
+	copy:SetAlpha(0.25)
+
+	copy.Texture = copy:CreateTexture(nil, "ARTWORK")
+	copy.Texture:SetAllPoints()
+	copy.Texture:SetTexture("Interface\\Buttons\\UI-GuildButton-PublicNote-Up")
+
+	copy:RegisterForClicks("AnyUp")
+	copy:SetScript("OnClick", Module.ChatCopy_OnClick)
+	copy:SetScript("OnEnter", Module.ChatCopy_OnEnter)
+	copy:SetScript("OnLeave", Module.ChatCopy_OnLeave)
+end
+
+local backdropInfo = {
+	bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+	edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+	tile = true,
+	tileEdge = true,
+	tileSize = 8,
+	edgeSize = 8,
+	insets = { left = 1, right = 1, top = 1, bottom = 1 },
+}
 
 Module:SetScript("OnEvent", function(saved)
 	if not SimpleCopyChatDatabase then
@@ -137,7 +167,7 @@ Module:SetScript("OnEvent", function(saved)
 	frame:SetUserPlaced(true)
 	frame:SetClampedToScreen(true)
 
-	frame:EnableMouse(true)
+	--frame:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 	frame:RegisterForDrag("LeftButton")
 	frame:SetScript("OnDragStart", function()
 		frame:StartMoving()
@@ -154,6 +184,9 @@ Module:SetScript("OnEvent", function(saved)
 		SimpleCopyChatDatabase[frame:GetName()] = { orig, "UIParent", tar, x, y }
 	end)
 
+	frame.content = CreateFrame("Frame", nil, frame)
+	frame.content:SetAllPoints()
+
 	frame.title = frame:CreateFontString(nil, "OVERLAY")
 	frame.title:SetFontObject(GameFontNormal)
 	frame.title:SetFont(select(1, frame.title:GetFont()), 22, select(3, frame.title:GetFont()))
@@ -163,7 +196,8 @@ Module:SetScript("OnEvent", function(saved)
 	frame.title:SetAlpha(0.7)
 
 	frame.close = CreateFrame("Button", "Kkthnx_CopyChatEditBox", frame, "UIPanelCloseButton")
-	frame.close:SetPoint("TOPRIGHT", frame)
+	frame.close:SetPoint("TOPRIGHT", frame, -6, -6)
+	frame.close:SetSize(20, 20)
 
 	local scrollArea = CreateFrame("ScrollFrame", "Kkthnx_CopyChatScrollFrame", frame, "UIPanelScrollFrameTemplate")
 	scrollArea:SetPoint("TOPLEFT", 12, -42)
@@ -198,19 +232,6 @@ Module:SetScript("OnEvent", function(saved)
 	end)
 
 	for i = 1, NUM_CHAT_WINDOWS do
-		local chat = _G[string_format("ChatFrame%d", i)]
-		local copy = CreateFrame("Button", format("Kkthnx_ChatCopyButton%d", i), chat)
-		copy:SetPoint("BOTTOMRIGHT", 22, -4)
-		copy:SetSize(16, 16)
-		copy:SetAlpha(0.25)
-
-		copy.Texture = copy:CreateTexture(nil, "ARTWORK")
-		copy.Texture:SetAllPoints()
-		copy.Texture:SetTexture("Interface\\Buttons\\UI-GuildButton-PublicNote-Up")
-
-		copy:RegisterForClicks("AnyUp")
-		copy:SetScript("OnClick", Module.ChatCopy_OnClick)
-		copy:SetScript("OnEnter", Module.ChatCopy_OnEnter)
-		copy:SetScript("OnLeave", Module.ChatCopy_OnLeave)
+		CreateCopyButton(i)
 	end
 end)
