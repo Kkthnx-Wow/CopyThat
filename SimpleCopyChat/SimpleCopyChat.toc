@@ -1,5 +1,0 @@
-## Name: SimpleCopyChat
-## Title: |cff669DFFSimpleCopyChat|r
-## Notes: Empty toc for Curseforge
-## Author: Josh "Kkthnx" Russell
-## Version: 1.0.1
