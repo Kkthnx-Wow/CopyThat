@@ -1,16 +1,43 @@
-# SimpleCopyChat
- A Simple Copy Chat AddOn
- 
- ![image](https://user-images.githubusercontent.com/40672673/219692849-84802625-7bbe-487f-81ed-9697abcbd9c2.png)
- 
- ## Join the community
-There are thousands of users, but most are content to simply download and use the interface without further ado. If you wish to get more involved though, have some questions you can't find answers to anywhere else or simply just wish to stop by and say hello, we have a [discord](https://discordapp.com/) server as well. 
+# CopyThat AddOn
 
-* [Discord](https://discord.gg/Rc9wcK9cAB)
-* [Twitter](https://twitter.com/KkthnxUI)
+**CopyThat** simplifies the process of copying chat messages directly from your chat window. Designed for ease of use, it adds a dedicated button to your chat frame, letting you extract messages instantly.
 
-## Buy me a coffee
-Donations are welcome, but not required to use the UI at all. Donations help me further my development and fuel my gaming! Donations will never be a requirement to use the UI! If you would like to donate, you can do so down below.
+---
 
-* [PayPal](https://www.paypal.me/kkthnx)
-* [Patreon](https://www.patreon.com/kkthnx)
+## Features
+
+- Adds a customizable Copy button to the chat frame.
+- Allows you to easily extract and copy all visible chat lines.
+- Fully customizable icon position and transparency.
+- Minimalist design with no unnecessary overhead.
+- Supports real-time configuration updates.
+
+---
+
+## Why CopyThat Exists
+
+CopyThat was created to streamline the process of sharing chat content, whether for social interaction, troubleshooting, or record-keeping. It eliminates the hassle of manually selecting text and ensures an effortless experience.
+
+---
+
+## Slash Commands
+
+- `/copythat` - Open the CopyThat settings menu.
+
+---
+
+## Support & Feedback
+
+We value your feedback and support! 
+
+- [Donate via PayPal](https://www.paypal.com/paypalme/KkthnxTV)  
+  Your donations help support the development of this addon.
+
+- [Report Feedback or Issues](https://github.com/Kkthnx-Wow/CopyThat)  
+  Visit our GitHub repository to report bugs or suggest new features.
+
+---
+
+## Thank You!
+
+Thank you for using **CopyThat**! We hope it enhances your chat experience and makes sharing content easier. If you have any ideas or suggestions, please don't hesitate to reach out.
