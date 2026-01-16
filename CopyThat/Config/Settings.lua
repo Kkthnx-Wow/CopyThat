@@ -1,14 +1,15 @@
+--[[-----------------------------------------------------------------------------
+-- Addon: CopyThat
+-- Author: Josh "Kkthnx" Russell
+-- Notes:
+-- - Purpose: Defines the configuration options and slash commands.
+-- - Design: Uses a declarative table structure to generate the settings UI.
+-----------------------------------------------------------------------------]]
+
 local _, namespace = ...
 
--- Register the settings
+-- REASON: defines the schema for saved variables and UI generation
 namespace:RegisterSettings("CopyThatDB", {
-	{
-		key = "isEnabled",
-		type = "toggle",
-		title = "Enable AddOn",
-		tooltip = "Enable or disable the Copy That AddOn.",
-		default = true,
-	},
 	{
 		key = "iconAlpha",
 		type = "slider",
@@ -33,7 +34,14 @@ namespace:RegisterSettings("CopyThatDB", {
 			{ value = "BOTTOMLEFT", label = "Bottom Left" },
 		},
 	},
+	{
+		key = "isEnabled",
+		type = "toggle",
+		title = "Enable AddOn",
+		tooltip = "Enable or disable the Copy That AddOn.",
+		default = true,
+	},
 })
 
--- Hook slash command to open settings
+-- REASON: hooks the slash commands to open the configuration interface
 namespace:RegisterSettingsSlash("/copythat", "/ct")

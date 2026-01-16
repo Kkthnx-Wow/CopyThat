@@ -1,41 +1,55 @@
+--[[-----------------------------------------------------------------------------
+-- Addon: CopyThat
+-- Author: Josh "Kkthnx" Russell
+-- Notes:
+-- - Purpose: Handles the core logic for capturing and copying chat messages.
+-- - Design: Uses a hidden Frame and ScrollFrame to emulate chat copying functionality.
+-----------------------------------------------------------------------------]]
+
 local _, namespace = ...
 
 local _G = _G
-local gsub, format, tconcat, tostring = string.gsub, string.format, table.concat, tostring
+local string_gsub, string_format, table_concat, tostring = string.gsub, string.format, table.concat, tostring
+local table_wipe = table.wipe
 local FCF_SetChatWindowFontSize = FCF_SetChatWindowFontSize
-local ScrollFrameTemplate_OnMouseWheel = ScrollFrameTemplate_OnMouseWheel
+local CreateFrame = CreateFrame
+local UIParent = UIParent
+local ChatFrame1 = ChatFrame1
 
 local chatLines = {}
 local chatCopyFrame, chatEditBox = nil, nil
 
--- Determines if a message can be changed
-local function CanModifyMessage(arg1, id)
+-- REASON: checking validity of the message ID to ensure safe modification
+local function canModifyMessage(arg1, id)
 	if id and arg1 == "" then
 		return id
 	end
 end
 
--- Checks if a message is protected
-local function IsMessageProtected(msg)
-	return msg and (msg ~= gsub(msg, "(:?|?)|K(.-)|k", CanModifyMessage))
+-- REASON: prevent modification of protected strings to avoid taint
+local function isMessageProtected(msg)
+	return msg and (msg ~= string_gsub(msg, "(:?|?)|K(.-)|k", canModifyMessage))
 end
 
--- Formats and replaces chat message content
-local function FormatChatMessage(msg, r, g, b)
+-- REASON: strips textures, animations, and links while applying color formatting
+local function formatChatMessage(msg, r, g, b)
 	local hexRGB = namespace.HexRGB(r, g, b)
-	msg = gsub(msg, "|T(.-):.-|t", "")
-	msg = gsub(msg, "|A(.-):.-|a", "")
-	return format("%s%s|r", hexRGB, msg)
+	msg = string_gsub(msg, "|T(.-):.-|t", "") -- Strip textures
+	msg = string_gsub(msg, "|A(.-):.-|a", "") -- Strip animations
+	msg = string_gsub(msg, "|H.-|h(.-)|h", "%1") -- Strip links but keep text
+	return string_format("%s%s|r", hexRGB, msg)
 end
 
--- Extracts lines from the chat frame
+-- REASON: iterates over chat lines to build the copyable text buffer
+-- PERF: reuse chatLines table to minimize garbage collection
 function namespace:GetChatLines()
+	table_wipe(chatLines)
 	local index = 1
 	for i = 1, self:GetNumMessages() do
 		local msg, r, g, b = self:GetMessageInfo(i)
-		if msg and not IsMessageProtected(msg) then
+		if msg and not isMessageProtected(msg) then
 			r, g, b = r or 1, g or 1, b or 1
-			msg = FormatChatMessage(msg, r, g, b)
+			msg = formatChatMessage(msg, r, g, b)
 			chatLines[index] = tostring(msg)
 			index = index + 1
 		end
@@ -43,16 +57,24 @@ function namespace:GetChatLines()
 	return index - 1
 end
 
--- Handles the Copy That button click
+-- REASON: toggles the copy frame visibility and populates it with current chat text
 function namespace:OnChatCopyButtonClick()
+	if not chatCopyFrame or not chatEditBox then
+		return
+	end
+
 	if not chatCopyFrame:IsShown() then
-		local chatFrame = _G.SELECTED_DOCK_FRAME
+		local chatFrame = _G["SELECTED_DOCK_FRAME"]
+		if not chatFrame then
+			return
+		end
+
 		local _, fontSize = chatFrame:GetFont()
 		FCF_SetChatWindowFontSize(chatFrame, chatFrame, 0.01)
 		chatCopyFrame:Show()
 
 		local lineCount = namespace.GetChatLines(chatFrame)
-		local text = tconcat(chatLines, "\n", 1, lineCount)
+		local text = table_concat(chatLines, "\n", 1, lineCount)
 		FCF_SetChatWindowFontSize(chatFrame, chatFrame, fontSize)
 		chatEditBox:SetText(text)
 	else
@@ -60,8 +82,9 @@ function namespace:OnChatCopyButtonClick()
 	end
 end
 
+-- REASON: initializes the main copy UI frame and its interactive elements
 function namespace:CreateChatCopyFrame()
-	if not namespace:GetOption("isEnabled") then
+	if chatCopyFrame or not namespace:GetOption("isEnabled") then
 		return
 	end
 
@@ -102,9 +125,7 @@ function namespace:CreateChatCopyFrame()
 		end
 
 		local _, max = scrollArea.ScrollBar:GetMinMaxValues()
-		for i = 1, max do
-			ScrollFrameTemplate_OnMouseWheel(scrollArea, -1)
-		end
+		scrollArea.ScrollBar:SetValue(max)
 	end)
 
 	scrollArea:SetScrollChild(chatEditBox)
@@ -120,7 +141,7 @@ function namespace:CreateChatCopyFrame()
 		TOPLEFT = { anchor = "TOPLEFT", x = -1, y = 1 },
 		BOTTOMLEFT = { anchor = "BOTTOMLEFT", x = -1, y = -6 },
 	}
-	copyButton:SetPoint(positions[iconPosition].anchor, _G.ChatFrame1, positions[iconPosition].x, positions[iconPosition].y)
+	copyButton:SetPoint(positions[iconPosition].anchor, ChatFrame1, positions[iconPosition].x, positions[iconPosition].y)
 	copyButton:SetSize(22, 20)
 
 	local iconAlpha = namespace:GetOption("iconAlpha")
@@ -134,7 +155,7 @@ function namespace:CreateChatCopyFrame()
 		namespace:OnChatCopyButtonClick()
 	end)
 
-	local tooltipText = format(namespace.L["Copy That"], namespace.LeftButton, namespace.RightButton)
+	local tooltipText = string_format(namespace.L["Copy That"], namespace.LeftButton, namespace.RightButton)
 	namespace.AddTooltip(copyButton, "ANCHOR_RIGHT", tooltipText)
 	copyButton:HookScript("OnEnter", function()
 		copyButton:SetAlpha(1)
@@ -152,9 +173,27 @@ function namespace:ADDON_LOADED(addonName)
 	self:CreateChatCopyFrame()
 end
 
--- Register a callback for real-time updates to position
+-- REASON: enable or disable the addon logic dynamically
+namespace:RegisterOptionCallback("isEnabled", function(newValue)
+	if newValue then
+		namespace:CreateChatCopyFrame()
+		if _G["CopyThatChatButton"] then
+			_G["CopyThatChatButton"]:Show()
+		end
+	else
+		if _G["CopyThatChatButton"] then
+			_G["CopyThatChatButton"]:Hide()
+		end
+		if chatCopyFrame then
+			chatCopyFrame:Hide()
+		end
+	end
+end)
+
+-- REASON: update icon position immediately when configuration changes
 namespace:RegisterOptionCallback("iconPosition", function(newValue)
-	if not CopyThatChatButton then
+	local copyButton = _G["CopyThatChatButton"]
+	if not copyButton then
 		return
 	end
 
@@ -167,16 +206,17 @@ namespace:RegisterOptionCallback("iconPosition", function(newValue)
 
 	local position = positions[newValue]
 	if position then
-		CopyThatChatButton:ClearAllPoints()
-		CopyThatChatButton:SetPoint(position.anchor, _G.ChatFrame1, position.x, position.y)
+		copyButton:ClearAllPoints()
+		copyButton:SetPoint(position.anchor, ChatFrame1, position.x, position.y)
 	end
 end)
 
--- Register a callback for real-time updates to iconAlpha
+-- REASON: update icon transparency immediately when configuration changes
 namespace:RegisterOptionCallback("iconAlpha", function(newValue)
-	if not CopyThatChatButton then
+	local copyButton = _G["CopyThatChatButton"]
+	if not copyButton then
 		return
 	end
 
-	CopyThatChatButton:SetAlpha(newValue)
+	copyButton:SetAlpha(newValue)
 end)

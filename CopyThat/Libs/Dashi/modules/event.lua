@@ -1,9 +1,9 @@
 local addonName, addon = ...
 
---[[ namespace.eventMixin
+--[[ namespace.eventMixin ![](https://img.shields.io/badge/object-teal)
 A multi-purpose [event](https://warcraft.wiki.gg/wiki/Events)-[mixin](https://en.wikipedia.org/wiki/Mixin).
 
-These methods are also available as methods directly on `namespace`, e.g:
+These methods are mixed into `namespace`, and thus are available directly, e.g:
 
 ```lua
 namespace:RegisterEvent('BAG_UPDATE', function(self, ...)
@@ -49,7 +49,7 @@ local function IsUnitValid(unit)
 end
 
 local eventMixin = {}
---[[ namespace.eventMixin:RegisterEvent(_event_, _callback_)
+--[[ namespace.eventMixin:RegisterEvent(_event_, _callback_) ![](https://img.shields.io/badge/function-blue)
 Registers a [frame `event`](https://warcraft.wiki.gg/wiki/Events) with the `callback` function.  
 If the callback returns positive it will be unregistered.
 --]]
@@ -71,7 +71,7 @@ function eventMixin:RegisterEvent(event, callback)
 	end
 end
 
---[[ namespace.eventMixin:UnregisterEvent(_event_, _callback_)
+--[[ namespace.eventMixin:UnregisterEvent(_event_, _callback_) ![](https://img.shields.io/badge/function-blue)
 Unregisters a [frame `event`](https://warcraft.wiki.gg/wiki/Events) from the `callback` function.
 --]]
 function eventMixin:UnregisterEvent(event, callback)
@@ -92,22 +92,30 @@ function eventMixin:UnregisterEvent(event, callback)
 	end
 end
 
---[[ namespace.eventMixin:UnregisterAllEvents(_callback_)
-Unregisters all [frame events](https://warcraft.wiki.gg/wiki/Events) from the `callback` function.
+--[[ namespace.eventMixin:UnregisterAllEvents([_callback_]) ![](https://img.shields.io/badge/function-blue)
+Unregisters all [frame events](https://warcraft.wiki.gg/wiki/Events), or specifically from the `callback` function.
 --]]
 function eventMixin:UnregisterAllEvents(callback)
-	assert(type(callback) == 'function', 'arg1 must be a function')
+	if callback then
+		assert(type(callback) == 'function', 'arg1 must be a function')
+	end
 
 	for event, cbs in next, callbacks do
 		for _, data in next, cbs do
-			if data.owner == self and data.callback == callback then
-				self:UnregisterEvent(event, callback)
+			if data.owner == self then
+				if callback then
+					if data.callback == callback then
+						self:UnregisterEvent(event, data.callback)
+					end
+				else
+					self:UnregisterEvent(event, data.callback)
+				end
 			end
 		end
 	end
 end
 
---[[ namespace.eventMixin:IsEventRegistered(_event_, _callback_)
+--[[ namespace.eventMixin:IsEventRegistered(_event_, _callback_) ![](https://img.shields.io/badge/function-blue)
 Checks if the [frame `event`](https://warcraft.wiki.gg/wiki/Events) is registered with the `callback` function.
 --]]
 function eventMixin:IsEventRegistered(event, callback)
@@ -123,18 +131,14 @@ function eventMixin:IsEventRegistered(event, callback)
 	end
 end
 
---[[ namespace.eventMixin:TriggerEvent(_event_[, _..._])
+--[[ namespace.eventMixin:TriggerEvent(_event_[, _..._]) ![](https://img.shields.io/badge/function-blue)
 Manually trigger the `event` (with optional arguments) on all registered callbacks.  
 If the callback returns positive it will be unregistered.
 --]]
 function eventMixin:TriggerEvent(event, ...)
 	if callbacks[event] then
 		for _, data in next, callbacks[event] do
-			local successful, ret = pcall(data.callback, data.owner, ...)
-			if not successful then
-				-- ret contains the error
-				error(ret)
-			elseif ret then
+			if data.callback(data.owner, ...) then
 				-- callbacks can unregister themselves by returning positively,
 				-- ret contains the boolean
 				eventMixin.UnregisterEvent(data.owner, event, data.callback)
@@ -161,7 +165,7 @@ local function getUnitEventHandler(unit)
 end
 
 local unitEventCallbacks = {}
---[[ namespace.eventMixin:RegisterUnitEvent(_event_, _unit_[, _unitN,..._], _callback_)
+--[[ namespace.eventMixin:RegisterUnitEvent(_event_, _unit_[, _unitN,..._], _callback_) ![](https://img.shields.io/badge/function-blue)
 Registers a [`unit`](https://warcraft.wiki.gg/wiki/UnitId)-specific [frame `event`](https://warcraft.wiki.gg/wiki/Events) with the `callback` function.  
 If the callback returns positive it will be unregistered for that unit.
 --]]
@@ -197,7 +201,7 @@ function eventMixin:RegisterUnitEvent(event, ...)
 	end
 end
 
---[[ namespace.eventMixin:UnregisterUnitEvent(_event_, _unit_[, _unitN,..._], _callback_)
+--[[ namespace.eventMixin:UnregisterUnitEvent(_event_, _unit_[, _unitN,..._], _callback_) ![](https://img.shields.io/badge/function-blue)
 Unregisters a [`unit`](https://warcraft.wiki.gg/wiki/UnitId)-specific [frame `event`](https://warcraft.wiki.gg/wiki/Events) from the `callback` function.
 --]]
 function eventMixin:UnregisterUnitEvent(event, ...)
@@ -225,7 +229,7 @@ function eventMixin:UnregisterUnitEvent(event, ...)
 	end
 end
 
---[[ namespace.eventMixin:IsUnitEventRegistered(_event_, _unit_[, _unitN,..._], _callback_)
+--[[ namespace.eventMixin:IsUnitEventRegistered(_event_, _unit_[, _unitN,..._], _callback_) ![](https://img.shields.io/badge/function-blue)
 Checks if the [`unit`](https://warcraft.wiki.gg/wiki/UnitId)-specific [frame `event`](https://warcraft.wiki.gg/wiki/Events) is registered with the `callback` function.
 --]]
 function eventMixin:IsUnitEventRegistered(event, ...)
@@ -248,17 +252,14 @@ function eventMixin:IsUnitEventRegistered(event, ...)
 	end
 end
 
---[[ namespace.eventMixin:TriggerEvent(_event_, _unit_[, _unitN,..._][, _..._])
+--[[ namespace.eventMixin:TriggerEvent(_event_, _unit_[, _unitN,..._][, _..._]) ![](https://img.shields.io/badge/function-blue)
 Manually trigger the [`unit`](https://warcraft.wiki.gg/wiki/UnitId)-specific `event` (with optional arguments) on all registered callbacks.  
 If the callback returns positive it will be unregistered.
 --]]
 function eventMixin:TriggerUnitEvent(event, unit, ...)
 	if unitEventCallbacks[unit] and unitEventCallbacks[unit][event] then
 		for _, data in next, unitEventCallbacks[unit][event] do
-			local successful, ret = pcall(data.callback, data.owner, ...)
-			if not successful then
-				error(ret)
-			elseif ret then
+			if data.callback(data.owner, ...) then
 				-- callbacks can unregister themselves by returning positively
 				eventMixin.UnregisterUnitEvent(data.owner, event, unit, data.callback)
 			end
@@ -266,69 +267,71 @@ function eventMixin:TriggerUnitEvent(event, unit, ...)
 	end
 end
 
--- special handling for combat events
-local combatEventCallbacks = {}
---[[ namespace.eventMixin:RegisterCombatEvent(_subEvent_, _callback_)
-Registers a [combat `subEvent`](https://warcraft.wiki.gg/wiki/COMBAT_LOG_EVENT) with the `callback` function.  
-If the callback returns positive it will be unregistered.
---]]
-function eventMixin:RegisterCombatEvent(event, callback)
-	assert(type(event) == 'string', 'arg1 must be a string')
-	assert(type(callback) == 'function', 'arg2 must be a function')
+if not addon:HasVersion(120000) then -- TODO: remove in Midnight
+	-- special handling for combat events
+	local combatEventCallbacks = {}
+	--[[ namespace.eventMixin:RegisterCombatEvent(_subEvent_, _callback_) ![](https://img.shields.io/badge/function-blue)
+	Registers a [combat `subEvent`](https://warcraft.wiki.gg/wiki/COMBAT_LOG_EVENT) with the `callback` function.  
+	If the callback returns positive it will be unregistered.
+	--]]
+	function eventMixin:RegisterCombatEvent(event, callback) -- DEPRECATED
+		assert(type(event) == 'string', 'arg1 must be a string')
+		assert(type(callback) == 'function', 'arg2 must be a function')
 
-	if not combatEventCallbacks[event] then
-		combatEventCallbacks[event] = {}
-	end
+		if not combatEventCallbacks[event] then
+			combatEventCallbacks[event] = {}
+		end
 
-	table.insert(combatEventCallbacks[event], {
-		callback = callback,
-		owner = self,
-	})
+		table.insert(combatEventCallbacks[event], {
+			callback = callback,
+			owner = self,
+		})
 
-	if not self:IsEventRegistered('COMBAT_LOG_EVENT_UNFILTERED', self.TriggerCombatEvent) then
-		self:RegisterEvent('COMBAT_LOG_EVENT_UNFILTERED', self.TriggerCombatEvent)
-	end
-end
-
---[[ namespace.eventMixin:UnregisterCombatEvent(_subEvent_, _callback_)
-Unregisters a [combat `subEvent`](https://warcraft.wiki.gg/wiki/COMBAT_LOG_EVENT) from the `callback` function.
---]]
-function eventMixin:UnregisterCombatEvent(event, callback)
-	assert(type(event) == 'string', 'arg1 must be a string')
-	assert(type(callback) == 'function', 'arg2 must be a function')
-
-	if combatEventCallbacks[event] then
-		for index, data in next, combatEventCallbacks[event] do
-			if data.owner == self and data.callback == callback then
-				combatEventCallbacks[event][index] = nil
-				break
-			end
+		if not self:IsEventRegistered('COMBAT_LOG_EVENT_UNFILTERED', self.TriggerCombatEvent) then
+			self:RegisterEvent('COMBAT_LOG_EVENT_UNFILTERED', self.TriggerCombatEvent)
 		end
 	end
-end
 
---[[ namespace.eventMixin:TriggerCombatEvent(_subEvent_)
-Manually trigger the [combat `subEvent`](https://warcraft.wiki.gg/wiki/COMBAT_LOG_EVENT) on all registered callbacks.  
-If the callback returns positive it will be unregistered.
+	--[[ namespace.eventMixin:UnregisterCombatEvent(_subEvent_, _callback_) ![](https://img.shields.io/badge/function-blue)
+	Unregisters a [combat `subEvent`](https://warcraft.wiki.gg/wiki/COMBAT_LOG_EVENT) from the `callback` function.
+	--]]
+	function eventMixin:UnregisterCombatEvent(event, callback) -- DEPRECATED
+		assert(type(event) == 'string', 'arg1 must be a string')
+		assert(type(callback) == 'function', 'arg2 must be a function')
 
-* Note: this is pretty useless on it's own, and should only ever be triggered by the event system.
---]]
-do
-	local function internalTrigger(_, event, _, ...)
 		if combatEventCallbacks[event] then
-			for _, data in next, combatEventCallbacks[event] do
-				local successful, ret = pcall(data.callback, data.owner, ...)
-				if not successful then
-					error(ret)
-				elseif ret then
-					eventMixin.UnregisterCombatEvent(data.owner, event, data.callback)
+			for index, data in next, combatEventCallbacks[event] do
+				if data.owner == self and data.callback == callback then
+					combatEventCallbacks[event][index] = nil
+					break
 				end
 			end
 		end
 	end
 
-	function eventMixin:TriggerCombatEvent()
-		internalTrigger(CombatLogGetCurrentEventInfo())
+	do
+		local function internalTrigger(_, event, _, ...)
+			if combatEventCallbacks[event] then
+				for _, data in next, combatEventCallbacks[event] do
+					local successful, ret = pcall(data.callback, data.owner, ...)
+					if not successful then
+						error(ret)
+					elseif ret then
+						eventMixin.UnregisterCombatEvent(data.owner, event, data.callback)
+					end
+				end
+			end
+		end
+
+		--[[ namespace.eventMixin:TriggerCombatEvent(_subEvent_) ![](https://img.shields.io/badge/function-blue)
+		Manually trigger the [combat `subEvent`](https://warcraft.wiki.gg/wiki/COMBAT_LOG_EVENT) on all registered callbacks.  
+		If the callback returns positive it will be unregistered.
+
+		* Note: this is pretty useless on it's own, and should only ever be triggered by the event system.
+		--]]
+		function eventMixin:TriggerCombatEvent() -- DEPRECATED
+			internalTrigger(CombatLogGetCurrentEventInfo())
+		end
 	end
 end
 
@@ -339,8 +342,8 @@ addon.eventMixin = eventMixin
 addon = setmetatable(addon, {
 	__newindex = function(t, key, value)
 		if key == 'OnLoad' then
-			--[[ namespace:OnLoad()
-			Shorthand for the [`ADDON_LOADED`](https://warcraft.wiki.gg/wiki/ADDON_LOADED) for the addon.
+			--[[ namespace:OnLoad() ![](https://img.shields.io/badge/function-blue)
+			Shorthand for the [`ADDON_LOADED`](https://warcraft.wiki.gg/wiki/ADDON_LOADED) event for the addon.
 
 			Usage:
 			```lua
@@ -351,16 +354,14 @@ addon = setmetatable(addon, {
 			--]]
 			addon:RegisterEvent('ADDON_LOADED', function(self, name)
 				if name == addonName then
-					local successful, ret = pcall(value, self)
-					if not successful then
-						error(ret)
+					if value(self) then
+						return true -- pass along unregistration state
 					end
-					return true -- unregister event
 				end
 			end)
 		elseif key == 'OnLogin' then
-			--[[ namespace:OnLogin()
-			Shorthand for the [`PLAYER_LOGIN`](https://warcraft.wiki.gg/wiki/PLAYER_LOGIN).
+			--[[ namespace:OnLogin() ![](https://img.shields.io/badge/function-blue)
+			Shorthand for the [`PLAYER_LOGIN`](https://warcraft.wiki.gg/wiki/PLAYER_LOGIN) event.
 
 			Usage:
 			```lua
@@ -370,19 +371,37 @@ addon = setmetatable(addon, {
 			```
 			--]]
 			addon:RegisterEvent('PLAYER_LOGIN', function(self)
-				local successful, ret = pcall(value, self)
-				if not successful then
-					error(ret)
+				if value(self) then
+					return true -- pass along unregistration state
 				end
-				return true -- unregister event
+			end)
+		elseif key == 'OnLogout' then
+			--[[ namespace:OnLogout() ![](https://img.shields.io/badge/function-blue)
+			Shorthand for the [`PLAYER_LOGOUT`](https://warcraft.wiki.gg/wiki/PLAYER_LOGOUT) event.
+
+			Usage:
+			```lua
+			function namespace:OnLogout()
+			    -- player has logged in!
+			end
+			```
+			--]]
+			addon:RegisterEvent('PLAYER_LOGOUT', function(self)
+				if value(self) then
+					return true -- pass along unregistration state
+				end
 			end)
 		elseif IsEventValid(key) then
-			--[[ namespace:_event_
+			--[[ namespace:_event_ ![](https://img.shields.io/badge/function-blue)
 			Registers a  to an anonymous function.
 
 			Usage:
 			```lua
 			function namespace:BAG_UPDATE(bagID)
+			    -- do something
+			end
+			-- or
+			namespace.BAG_UPDATE = function(self, bagID)
 			    -- do something
 			end
 			```
@@ -395,7 +414,7 @@ addon = setmetatable(addon, {
 	end,
 	__index = function(t, key)
 		if IsEventValid(key) then
-			--[[ namespace:_event_([_..._])
+			--[[ namespace:_event_([_..._]) ![](https://img.shields.io/badge/function-blue)
 			Manually trigger all registered anonymous `event` callbacks, with optional arguments.
 
 			Usage:

@@ -8,8 +8,8 @@ local _, namespace = ...
 ```
 --]]
 
---[[ namespace:ArgCheck(arg, argIndex, type[, type...])
-Checks if the argument `arg` at position `argIndex` is of type(s).
+--[[ namespace:ArgCheck(arg, argIndex, type[, type...]) ![](https://img.shields.io/badge/function-blue)
+Checks if the argument `arg` at position `argIndex` is of `type`(s).
 --]]
 function addon:ArgCheck(arg, argIndex, ...)
 	assert(type(argIndex) == 'number', 'Bad argument #2 to \'ArgCheck\' (number expected, got ' .. type(argIndex) .. ')')
@@ -25,13 +25,10 @@ function addon:ArgCheck(arg, argIndex, ...)
 	error(string.format('Bad argument #%d to \'%s\' (%s expected, got %s)', argIndex, name, types, type(arg)), 3)
 end
 
-do
+if not addon:HasVersion(120000) then
 	-- UnitType-0-ServerID-InstanceID-ZoneUID-ID-SpawnUID
 	local GUID_PATTERN = '(%w+)%-0%-(%d+)%-(%d+)%-(%d+)%-(%d+)%-(.+)'
-	--[[ namespace:ExtractFieldsFromUnitGUID(_guid_)
-	Returns the individual fields from the given [`guid`](https://warcraft.wiki.gg/wiki/GUID), typecast to their correct types.
-	--]]
-	function addon:ExtractFieldsFromUnitGUID(guid)
+	function addon:ExtractFieldsFromUnitGUID(guid) -- DEPRECATED
 		if guid then
 			local unitType, serverID, instanceID, zoneUID, id, spawnUID = guid:match(GUID_PATTERN)
 			if unitType then
@@ -41,19 +38,48 @@ do
 	end
 end
 
---[[ namespace:GetUnitID(_unit_)
-Returns the integer `id` of the given [`unit`](https://warcraft.wiki.gg/wiki/UnitId).
+--[[ namespace:GetUnitID(_unit_) ![](https://img.shields.io/badge/function-blue)
+Returns the creature ID for the given [`unit`](https://warcraft.wiki.gg/wiki/UnitId).
 --]]
-function addon:GetUnitID(unit)
-	if unit and UnitExists(unit) then
-		local _, _, _, _, unitID = addon:ExtractFieldsFromUnitGUID(UnitGUID(unit))
-		return unitID
+if not addon:HasVersion(120000) then
+	-- remove in 12.x, replaced with UnitCreatureID
+	function addon:GetUnitID(unit) -- DEPRECATED
+		if unit and UnitExists(unit) then
+			local unitGUID = UnitGUID(unit)
+			local _, _, _, _, unitID = addon:ExtractFieldsFromUnitGUID(unitGUID)
+			return unitID, unitGUID
+		end
+	end
+end
+
+do
+	local creatureNames = setmetatable({}, {
+		__index = function(self, npcID)
+			local data = C_TooltipInfo.GetHyperlink('unit:Creature-0-0-0-0-' .. npcID .. '-0')
+			local name = data and data.lines and data.lines[1] and data.lines[1].leftText
+			if name then
+				rawset(self, npcID, name)
+				return name
+			end
+		end
+	})
+
+	--[[ namespace:GetCreatureName(_creatureID_) ![](https://img.shields.io/badge/function-blue)
+	Returns the name for the NPC by the given `npcID`.
+
+	* Warning: this depends on the cache, and might not yield results the first time.
+	--]]
+	function addon:GetCreatureName(creatureID)
+		return creatureNames[creatureID]
+	end
+	function addon:GetNPCName(npcID) -- DEPRECATED
+		return addon:GetCreatureName(npcID)
 	end
 end
 
 do
 	local ITEM_LINK_FORMAT = '|Hitem:%d|h'
-	--[[ namespace:GetItemLinkFromID(_itemID_)
+	--[[ namespace:GetItemLinkFromID(_itemID_) ![](https://img.shields.io/badge/function-blue)
 	Generates an [item link](https://warcraft.wiki.gg/wiki/ItemLink) from an `itemID`.  
 	This is a crude generation and won't have valid data for complex items.
 	--]]
@@ -62,31 +88,35 @@ do
 	end
 end
 
---[[ namespace:GetPlayerMapID()
-Returns the ID of the current map the zone the player is located in.
+--[[ namespace:GetPlayerMapID() ![](https://img.shields.io/badge/function-blue)
+Returns the ID of the current map/zone the player is located in.
 --]]
 function addon:GetPlayerMapID()
 	-- TODO: maybe use HBD data if it's available
 	return C_Map.GetBestMapForUnit('player') or -1
 end
 
---[[ namespace:GetPlayerPosition(_mapID_)
+--[[ namespace:GetPlayerPosition(_mapID_) ![](https://img.shields.io/badge/function-blue)
 Returns the `x` and `y` coordinates for the player in the given `mapID` (if they are valid).
 --]]
 function addon:GetPlayerPosition(mapID)
-	local pos = C_Map.GetPlayerMapPosition(mapID, 'player')
+	local pos = C_Map.GetPlayerMapPosition(mapID or addon:GetPlayerMapID(), 'player')
 	if pos then
 		return pos:GetXY()
 	end
 end
 
-do
+--[[ namespace:GetUnitAura(_unitID_, _spellID_) ![](https://img.shields.io/badge/function-blue)
+Returns the aura by `spellID` on the [`unitID`](https://warcraft.wiki.gg/wiki/UnitId), if it exists.
+--]]
+if addon:HasVersion(120000) then
+	-- because there's a bug with spell whitelisting we have to use the old method, hopefully it'll be fixed soon enough
 	local function auraSlotsWrapper(unit, spellID, token, ...)
 		local slot, data
 		for index = 1, select('#', ...) do
 			slot = select(index, ...)
 			data = C_UnitAuras.GetAuraDataBySlot(unit, slot)
-			if spellID == data.spellId and data.sourceUnit then
+			if not issecretvalue(data.spellId) and spellID == data.spellId and data.sourceUnit ~= nil then
 				return nil, data
 			end
 		end
@@ -94,28 +124,26 @@ do
 		return token
 	end
 
-	--[[ namespace:GetUnitAura(_unit_, _spellID_, _filter_)
-	Returns the aura by `spellID` on the [`unit`](https://warcraft.wiki.gg/wiki/UnitId), if it exists.
-
-	* [`unitID`](https://warcraft.wiki.gg/wiki/UnitId)
-	* `spellID` - spell ID to check for
-	* `filter` - aura filter, see [UnitAura](https://warcraft.wiki.gg/wiki/API_C_UnitAuras.GetAuraDataByIndex#Filters)
-	--]]
 	function addon:GetUnitAura(unit, spellID, filter)
 		local token, data
 		repeat
-			token, data = auraSlotsWrapper(unit, spellID, C_UnitAuras.GetAuraSlots(unit, filter, nil, token))
+			token, data = auraSlotsWrapper(unit, spellID, C_UnitAuras.GetAuraSlots(unit, filter or 'HELPFUL', nil, token))
 		until token == nil
 
 		return data
 	end
+else
+	-- just remove it, the new API is a drop-in replacement
+	function addon:GetUnitAura(unit, spellID) -- DEPRECATED
+		return C_UnitAuras.GetUnitAuraBySpellID(unit, spellID)
+	end
 end
 
---[[ namespace:CreateColor(r, g, b[, a])
+--[[ namespace:CreateColor(r, g, b[, a]) ![](https://img.shields.io/badge/function-blue)
 Wrapper for CreateColor that can handle >1-255 range as well.  
 Alpha (`a`) will always be in the 0-1 range.
 --]]
---[[ namespace:CreateColor(hex)
+--[[ namespace:CreateColor(hex) ![](https://img.shields.io/badge/function-blue)
 Wrapper for CreateColor that can handle hex colors (both `RRGGBB` and `AARRGGBB`).
 --]]
 function addon:CreateColor(r, g, b, a)
@@ -142,10 +170,12 @@ function addon:CreateColor(r, g, b, a)
 	end
 
 	local color = CreateColor(r, g, b, a)
-	-- oUF compat; TODO: do something with this in oUF?
-	color[1] = r
-	color[2] = g
-	color[3] = b
+	if not addon:HasVersion(120000) then -- TODO: remove in Midnight
+		-- oUF compat
+		color[1] = r
+		color[2] = g
+		color[3] = b
+	end
 	return color
 end
 
@@ -153,7 +183,7 @@ do
 	local timeFormatter = CreateFromMixins(SecondsFormatterMixin)
 	timeFormatter:Init(1, SecondsFormatter.Abbreviation.OneLetter)
 	timeFormatter:SetStripIntervalWhitespace(true)
-	--[[ namespace:FormatTime(_timeInSeconds_)
+	--[[ namespace:FormatTime(_timeInSeconds_) ![](https://img.shields.io/badge/function-blue)
 	Formats the given `timeInSeconds` to a readable, but abbreviated format.
 	--]]
 	function addon:FormatTime(timeInSeconds)
