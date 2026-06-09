@@ -16,6 +16,13 @@ local CreateFrame = CreateFrame
 local UIParent = UIParent
 local ChatFrame1 = ChatFrame1
 
+-- REASON: Midnight (12.0) can return chat content as Secret Values inside instances.
+-- Cache issecretvalue locally and provide a no-op fallback on pre-Midnight clients.
+-- luacheck: globals issecretvalue
+local issecretvalue = issecretvalue or function(...)
+	return false
+end
+
 local chatLines = {}
 local chatCopyFrame, chatEditBox = nil, nil
 
@@ -42,13 +49,21 @@ end
 
 -- REASON: iterates over chat lines to build the copyable text buffer
 -- PERF: reuse chatLines table to minimize garbage collection
+-- MIDNIGHT: chat messages (and their colors) can be Secret Values while inside
+-- instances. String/arithmetic operations on Secrets error, so skip those lines
+-- rather than crashing; non-instance content is still fully copyable.
 function namespace:GetChatLines()
 	table_wipe(chatLines)
 	local index = 1
 	for i = 1, self:GetNumMessages() do
 		local msg, r, g, b = self:GetMessageInfo(i)
-		if msg and not isMessageProtected(msg) then
-			r, g, b = r or 1, g or 1, b or 1
+		if msg and not issecretvalue(msg) and not isMessageProtected(msg) then
+			-- Fall back to white if any color component is Secret; never do arithmetic on it.
+			if issecretvalue(r) or issecretvalue(g) or issecretvalue(b) then
+				r, g, b = 1, 1, 1
+			else
+				r, g, b = r or 1, g or 1, b or 1
+			end
 			msg = formatChatMessage(msg, r, g, b)
 			chatLines[index] = tostring(msg)
 			index = index + 1
