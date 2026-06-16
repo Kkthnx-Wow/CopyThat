@@ -1,80 +1,120 @@
---[[-----------------------------------------------------------------------------
--- Addon: CopyThat
--- Author: Josh "Kkthnx" Russell
--- Notes:
--- - Purpose: Provides utility functions for tooltips, color conversions, and UI toggling.
--- - Design: Extends the addon namespace with helper methods used throughout the codebase.
------------------------------------------------------------------------------]]
+--[[
+	CopyThat - Functions
+	-------------------------------------------------------------------------
+	Shared utility library. Stateless helpers for colour, output, defaults,
+	secret-value guards and small UI conveniences.
+--]]
 
-local _, namespace = ...
+local _, ns = ...
+local C, F = ns.C, ns.F
 
-local GameTooltip = GameTooltip
-local string_format = string.format
-local math_floor = math.floor
-local type = type
-local unpack = unpack
+local select, type, tostring = select, type, tostring
+local floor = math.floor
+local format = string.format
+local tconcat = table.concat
+local wipe = wipe
+local DEFAULT_CHAT_FRAME = DEFAULT_CHAT_FRAME
+local tinsert = table.insert
 
--- REASON: hides the main game tooltip to prevent obstruction
-function namespace:HideTooltip()
-	GameTooltip:Hide()
+local PREFIX = format("|c%s%s|r:", C.BrandHex, "CopyThat")
+
+-- ---------------------------------------------------------------------------
+-- Output
+-- ---------------------------------------------------------------------------
+local printBuffer = {}
+
+function F.Print(...)
+	wipe(printBuffer)
+	printBuffer[1] = PREFIX
+	for i = 1, select("#", ...) do
+		printBuffer[i + 1] = tostring((select(i, ...)))
+	end
+	DEFAULT_CHAT_FRAME:AddMessage(tconcat(printBuffer, " "))
 end
 
--- REASON: populates the tooltip with title and text when hovering over an element
-local function tooltipOnEnter(self)
-	GameTooltip:SetOwner(self, self.anchor)
-	GameTooltip:ClearLines()
+-- ---------------------------------------------------------------------------
+-- Colour helpers
+-- ---------------------------------------------------------------------------
 
-	if self.title then
-		GameTooltip:AddLine(self.title)
-	end
-
-	if self.text then
-		local r, g, b = 1, 0.8, 0
-		GameTooltip:AddLine(self.text, r, g, b, 1)
-	end
-
-	GameTooltip:Show()
-end
-
--- REASON: configures an interactive element to display a tooltip on hover
-function namespace:AddTooltip(anchor, text, color, showTips)
-	self.anchor = anchor
-	self.text = text
-	self.color = color
-	if showTips then
-		self.title = namespace.L["Tips"]
-	end
-	self:SetScript("OnEnter", tooltipOnEnter)
-	self:SetScript("OnLeave", namespace.HideTooltip)
-end
-
--- REASON: converts RGB values (table or varargs) into a hex color string
--- REASON: ensures components are integers to prevent format errors
-function namespace.HexRGB(r, g, b)
-	if not r then
-		return
-	end
-
+function F.RGBToHex(r, g, b)
 	if type(r) == "table" then
 		if r.r then
 			r, g, b = r.r, r.g, r.b
 		else
-			r, g, b = unpack(r)
+			r, g, b = r[1], r[2], r[3]
 		end
 	end
-
 	if not r or not g or not b then
-		return "|cffffffff"
+		return "ffffffff"
 	end
-
-	return string_format("|cff%02x%02x%02x", math_floor(r * 255), math_floor(g * 255), math_floor(b * 255))
+	return format("ff%02x%02x%02x", floor(r * 255), floor(g * 255), floor(b * 255))
 end
 
--- REASON: toggles the visibility state of a given frame
-function namespace:TogglePanel(frame)
-	if frame:IsShown() then
-		frame:Hide()
-	else
-		frame:Show()
+function F.Colorize(text, color)
+	if type(color) == "string" then
+		color = C.Colors[color] or C.Colors.white
+	end
+	return format("|c%s%s|r", F.RGBToHex(color), text)
+end
+
+-- ---------------------------------------------------------------------------
+-- Table helpers
+-- ---------------------------------------------------------------------------
+
+function F.CopyDefaults(defaults, target)
+	if type(target) ~= "table" then
+		target = {}
+	end
+	for key, value in pairs(defaults) do
+		if type(value) == "table" then
+			target[key] = F.CopyDefaults(value, target[key])
+		elseif target[key] == nil or type(target[key]) ~= type(value) then
+			target[key] = value
+		end
+	end
+	return target
+end
+
+-- ---------------------------------------------------------------------------
+-- UI helpers
+-- ---------------------------------------------------------------------------
+
+function F.MakeWindowMovable(frame, escapeName)
+	if not frame then
+		return
+	end
+	frame:EnableMouse(true)
+	frame:SetMovable(true)
+	frame:RegisterForDrag("LeftButton")
+	frame:SetScript("OnDragStart", frame.StartMoving)
+	frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
+	if escapeName then
+		tinsert(_G["UISpecialFrames"], escapeName)
+	end
+end
+
+-- ---------------------------------------------------------------------------
+-- Secret values (Patch 12.0)
+--   Chat content can be secret inside instances. Never boolean-test or do
+--   arithmetic on a value that might be secret without a guard first.
+-- ---------------------------------------------------------------------------
+do
+	local issecretvalue = _G["issecretvalue"]
+	local canaccessvalue = _G["canaccessvalue"]
+
+	function F.IsSecret(value)
+		return issecretvalue and issecretvalue(value)
+	end
+
+	function F.NotSecret(value)
+		return not F.IsSecret(value)
+	end
+
+	function F.CanAccessValue(value)
+		return not canaccessvalue or canaccessvalue(value)
+	end
+
+	function F.CanNotAccessValue(value)
+		return not F.CanAccessValue(value)
 	end
 end

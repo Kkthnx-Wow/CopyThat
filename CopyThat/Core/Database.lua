@@ -1,21 +1,99 @@
---[[-----------------------------------------------------------------------------
--- Addon: CopyThat
--- Author: Josh "Kkthnx" Russell
--- Notes:
--- - Purpose: Defines shared data constants and asset paths.
--- - Design: Centralizes asset definitions for consistent use across the addon.
------------------------------------------------------------------------------]]
+--[[
+	CopyThat - Database
+	-------------------------------------------------------------------------
+	Lightweight saved-variable manager with profile support.
 
-local _, namespace = ...
+	Layout of `CopyThatDB`:
+	    {
+	        profiles    = { ["Default"] = { chatCopy = { ... } } },
+	        profileKeys = { ["Char - Realm"] = "Default" },
+	        global      = { ... account-wide data ... },
+	    }
 
-local STANDARD_TEXT_FONT = STANDARD_TEXT_FONT
+	Migration v1 upgrades the legacy flat Dashi-era `CopyThatDB` table
+	(iconAlpha, iconPosition, isEnabled at the root) into the profile layout.
+--]]
 
--- REASON: defines valid font configuration for the edit box
-namespace.Font = { STANDARD_TEXT_FONT, 12, "OUTLINE" }
+local _, ns = ...
+local C, F = ns.C, ns.F
 
--- REASON: pre-defined texture strings for tutorial frame mouse buttons
-namespace.LeftButton = " |TInterface\\TUTORIALFRAME\\UI-TUTORIAL-FRAME:13:11:0:-1:512:512:12:66:230:307|t "
-namespace.RightButton = " |TInterface\\TUTORIALFRAME\\UI-TUTORIAL-FRAME:13:11:0:-1:512:512:12:66:333:410|t "
+ns.defaults = {
+	profile = {},
+	global = {},
+}
 
--- REASON: path to the custom copy button texture
-namespace.CopyChatTexture = "Interface\\AddOns\\CopyThat\\Media\\CopyButton.tga"
+function ns:RegisterDefaults(defaults, scope)
+	scope = scope or "profile"
+	F.CopyDefaults(defaults, ns.defaults[scope])
+end
+
+local DB_SCHEMA_VERSION = 1
+
+local migrations = {
+	-- Dashi stored settings flat on CopyThatDB; fold them into chatCopy defaults.
+	[1] = function(root)
+		if root.profiles and root.profiles.Default and root.profiles.Default.chatCopy then
+			return
+		end
+
+		local chatCopy = {}
+		if root.iconAlpha ~= nil then
+			chatCopy.iconAlpha = root.iconAlpha
+		end
+		if root.iconPosition ~= nil then
+			chatCopy.iconPosition = root.iconPosition
+		end
+		if root.isEnabled ~= nil then
+			chatCopy.enable = root.isEnabled
+		end
+
+		if next(chatCopy) then
+			root.profiles = root.profiles or {}
+			root.profiles.Default = root.profiles.Default or {}
+			root.profiles.Default.chatCopy = chatCopy
+		end
+
+		root.iconAlpha = nil
+		root.iconPosition = nil
+		root.isEnabled = nil
+	end,
+}
+
+local function MigrateDatabase(root)
+	local version = root.schemaVersion or 0
+	for v = version + 1, DB_SCHEMA_VERSION do
+		local step = migrations[v]
+		if step then
+			step(root)
+		end
+	end
+	root.schemaVersion = DB_SCHEMA_VERSION
+end
+
+function ns:SetProfile(profileName)
+	local root = _G.CopyThatDB
+	root.profileKeys[C.Player.key] = profileName
+	root.profiles[profileName] = root.profiles[profileName] or {}
+
+	ns.db = F.CopyDefaults(ns.defaults.profile, root.profiles[profileName])
+	ns.profileName = profileName
+
+	if ns.OnProfileChanged then
+		ns:OnProfileChanged(profileName)
+	end
+end
+
+function ns:SetupDatabase()
+	local root = _G.CopyThatDB or {}
+	_G.CopyThatDB = root
+	root.profiles = root.profiles or {}
+	root.profileKeys = root.profileKeys or {}
+	root.global = F.CopyDefaults(ns.defaults.global, root.global)
+
+	MigrateDatabase(root)
+
+	ns.global = root.global
+
+	local profileName = root.profileKeys[C.Player.key] or "Default"
+	ns:SetProfile(profileName)
+end

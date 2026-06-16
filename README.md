@@ -17,11 +17,12 @@
 
 **CopyThat** adds a single, tidy button to your chat frame that pulls every visible line out of the active chat window and drops it into a clean, scrollable text box — ready to select and copy. No menus to dig through, no clutter, no overhead.
 
-Instead of fighting Blizzard's chat frame to manually drag-select text, you click once and the whole window is right there as plain, copyable text — links flattened to their words, textures and icons stripped out, original colours preserved.
+Instead of fighting Blizzard's chat frame to manually drag-select text, you click once and the whole window is right there as plain, copyable text — links flattened to their words, textures and icons stripped out, original colours preserved. Built on the same modular engine patterns as [NexEnhance](https://github.com/Kkthnx-Wow/NexEnhance), but focused on doing one job and doing it well.
 
 - **One click** — grab the entire visible chat window instantly.
 - **Clean output** — links become readable text, textures/animations are removed, message colours are kept.
 - **Stays out of the way** — a small icon on the chat frame, positionable and fade-adjustable to taste.
+- **Native settings** — a clean options panel built on Blizzard's own Settings API, with live-apply toggles.
 - **Light by design** — a hidden frame and a reused line buffer; effectively zero cost when idle.
 - **Plays everywhere** — works across Midnight, The War Within, Cataclysm Classic and Classic Era.
 
@@ -45,14 +46,17 @@ Hover the chat frame and you'll find the **Copy** icon in the corner you chose. 
 
 | Command | Description |
 | --- | --- |
-| `/copythat` | Open the CopyThat options panel |
-| `/ct` | Open the CopyThat options panel |
+| `/copythat` or `/ct` | Open the options panel |
+| `/copythat help` | Show slash-command help |
 
 ---
 
 ## Features
 
-- **Chat Copy Button** — a small icon on the chat frame that captures every visible line of the active chat window into a scrollable, copyable text box.
+CopyThat ships as a single self-contained module — everything lives under **Chat** in the options panel.
+
+### Chat
+- **Copy Button** — a small icon on the chat frame that captures every visible line of the active chat window into a scrollable, copyable text box. Follows the selected General-chat tab when you switch windows.
 - **Clean Text Extraction** — strips textures (`|T...|t`) and animations (`|A...|a`), flattens hyperlinks to their display text, and preserves each message's original colour.
 - **Icon Position** — place the button in any corner of the chat frame: **Bottom Right**, **Top Right**, **Top Left** or **Bottom Left**.
 - **Icon Transparency** — set the resting opacity of the icon (it fades to full opacity on hover so it's never hard to find).
@@ -68,11 +72,9 @@ Open the panel with **`/copythat`** (or **`/ct`**), or through the Blizzard AddO
 
 | Option | Description | Default |
 | --- | --- | --- |
+| **Enable Chat Copy** | Master on/off switch for CopyThat. | `On` |
 | **Icon Transparency** | Resting opacity of the chat-frame Copy icon (0.0–1.0). | `0.5` |
 | **Icon Position** | Which corner of the chat frame the icon sits in. | `Bottom Right` |
-| **Enable AddOn** | Master on/off switch for CopyThat. | `On` |
-
-An **About CopyThat** sub-page lists the addon's purpose, features and support links.
 
 ---
 
@@ -84,7 +86,12 @@ Contributions, bug reports and ideas are welcome! Open an [issue](https://github
 
 ## Credits
 
-CopyThat is built on **[Dashi](https://github.com/p3lim-wow/Dashi)** by **p3lim**, whose lightweight helper framework powers the addon's events, settings and slash commands. Thank you for the foundation that makes small, focused addons like this a joy to write.
+CopyThat borrows with respect and adapts ideas from addon authors who solved this problem first:
+
+- **Siweia** (NDui) — the original chat-copy module that NexEnhance's Chat Copy (and this addon) trace their roots to.
+- **NexEnhance** — the modular engine, settings patterns and Midnight secret-value discipline this rewrite is built on.
+
+Thank you both. CopyThat would not exist without you.
 
 ---
 
