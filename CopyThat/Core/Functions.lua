@@ -1,8 +1,7 @@
 --[[
 	CopyThat - Functions
 	-------------------------------------------------------------------------
-	Shared utility library. Stateless helpers for colour, output, defaults,
-	secret-value guards and small UI conveniences.
+	Shared stateless helpers used across the addon.
 --]]
 
 local _, ns = ...
@@ -16,11 +15,7 @@ local wipe = wipe
 local DEFAULT_CHAT_FRAME = DEFAULT_CHAT_FRAME
 local tinsert = table.insert
 
-local PREFIX = format("|c%s%s|r:", C.BrandHex, "CopyThat")
-
--- ---------------------------------------------------------------------------
--- Output
--- ---------------------------------------------------------------------------
+local PREFIX = format("|c%sCopyThat|r:", C.BrandHex)
 local printBuffer = {}
 
 function F.Print(...)
@@ -31,35 +26,6 @@ function F.Print(...)
 	end
 	DEFAULT_CHAT_FRAME:AddMessage(tconcat(printBuffer, " "))
 end
-
--- ---------------------------------------------------------------------------
--- Colour helpers
--- ---------------------------------------------------------------------------
-
-function F.RGBToHex(r, g, b)
-	if type(r) == "table" then
-		if r.r then
-			r, g, b = r.r, r.g, r.b
-		else
-			r, g, b = r[1], r[2], r[3]
-		end
-	end
-	if not r or not g or not b then
-		return "ffffffff"
-	end
-	return format("ff%02x%02x%02x", floor(r * 255), floor(g * 255), floor(b * 255))
-end
-
-function F.Colorize(text, color)
-	if type(color) == "string" then
-		color = C.Colors[color] or C.Colors.white
-	end
-	return format("|c%s%s|r", F.RGBToHex(color), text)
-end
-
--- ---------------------------------------------------------------------------
--- Table helpers
--- ---------------------------------------------------------------------------
 
 function F.CopyDefaults(defaults, target)
 	if type(target) ~= "table" then
@@ -75,9 +41,22 @@ function F.CopyDefaults(defaults, target)
 	return target
 end
 
--- ---------------------------------------------------------------------------
--- UI helpers
--- ---------------------------------------------------------------------------
+function F.RGBToHex(r, g, b)
+	if type(r) == "table" then
+		r, g, b = r[1], r[2], r[3]
+	end
+	if not (r and g and b) then
+		return "ffffffff"
+	end
+	return format("ff%02x%02x%02x", floor(r * 255), floor(g * 255), floor(b * 255))
+end
+
+function F.Colorize(text, color)
+	if type(color) == "string" then
+		color = C.Colors[color] or C.Colors.white
+	end
+	return format("|c%s%s|r", F.RGBToHex(color), text)
+end
 
 function F.MakeWindowMovable(frame, escapeName)
 	if not frame then
@@ -85,22 +64,23 @@ function F.MakeWindowMovable(frame, escapeName)
 	end
 	frame:EnableMouse(true)
 	frame:SetMovable(true)
+	frame:SetClampedToScreen(true)
 	frame:RegisterForDrag("LeftButton")
 	frame:SetScript("OnDragStart", frame.StartMoving)
 	frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
 	if escapeName then
-		tinsert(_G["UISpecialFrames"], escapeName)
+		tinsert(_G.UISpecialFrames, escapeName)
 	end
 end
 
--- ---------------------------------------------------------------------------
--- Secret values (Patch 12.0)
---   Chat content can be secret inside instances. Never boolean-test or do
---   arithmetic on a value that might be secret without a guard first.
--- ---------------------------------------------------------------------------
+function F.GetIconPositionOffset(positionKey)
+	local pos = C.IconPositions[positionKey] or C.IconPositions.BOTTOMRIGHT
+	local x = C.Client.isRetail and pos.retailX or pos.classicX
+	return pos.anchor, x, pos.y
+end
+
 do
-	local issecretvalue = _G["issecretvalue"]
-	local canaccessvalue = _G["canaccessvalue"]
+	local issecretvalue = _G.issecretvalue
 
 	function F.IsSecret(value)
 		return issecretvalue and issecretvalue(value)
@@ -108,13 +88,5 @@ do
 
 	function F.NotSecret(value)
 		return not F.IsSecret(value)
-	end
-
-	function F.CanAccessValue(value)
-		return not canaccessvalue or canaccessvalue(value)
-	end
-
-	function F.CanNotAccessValue(value)
-		return not F.CanAccessValue(value)
 	end
 end

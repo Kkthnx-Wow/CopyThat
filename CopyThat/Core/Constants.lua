@@ -1,21 +1,17 @@
 --[[
 	CopyThat - Constants
 	-------------------------------------------------------------------------
-	Static, read-mostly data: client/player info, colour palette and media
-	paths. Anything looked up once at login and reused everywhere lives here.
+	Client info, brand colours, and shared backdrop presets.
 --]]
 
 local _, ns = ...
 local C = ns.C
 
+local GetBuildInfo = GetBuildInfo
+local GetLocale = GetLocale
 local UnitName = UnitName
 local GetRealmName = GetRealmName
-local GetLocale = GetLocale
-local GetBuildInfo = GetBuildInfo
 
--- ---------------------------------------------------------------------------
--- Client information
--- ---------------------------------------------------------------------------
 do
 	local version, build, _, interface = GetBuildInfo()
 	C.Client = {
@@ -27,9 +23,6 @@ do
 	}
 end
 
--- ---------------------------------------------------------------------------
--- Player information
--- ---------------------------------------------------------------------------
 do
 	C.Player = {
 		name = UnitName("player"),
@@ -38,39 +31,20 @@ do
 	C.Player.key = C.Player.name .. " - " .. C.Player.realm
 end
 
--- ---------------------------------------------------------------------------
--- Colours
--- ---------------------------------------------------------------------------
 C.Colors = {
-	red = { 0.90, 0.30, 0.30 },
-	green = { 0.40, 0.78, 0.40 },
-	white = { 1.00, 1.00, 1.00 },
 	brand = { 0.36, 0.75, 0.75 }, -- #5bc0be
+	white = { 1.00, 1.00, 1.00 },
 	header = { 1.00, 0.82, 0.00 },
-	label = { 0.60, 0.80, 1.00 },
 }
 
 C.BrandHex = ("ff%02x%02x%02x"):format(C.Colors.brand[1] * 255, C.Colors.brand[2] * 255, C.Colors.brand[3] * 255)
 
--- ---------------------------------------------------------------------------
--- Media
--- ---------------------------------------------------------------------------
 C.Media = {
 	Textures = {
-		copyButton = "Interface\\AddOns\\CopyThat\\Media\\CopyButton.tga",
-	},
-	Fonts = {
-		normal = STANDARD_TEXT_FONT,
+		copyIcon = "Interface\\AddOns\\CopyThat\\Media\\CopyButton.tga",
 	},
 }
 
--- Tutorial-frame mouse button icons for the copy tooltip hint.
-C.LeftButton = " |TInterface\\TUTORIALFRAME\\UI-TUTORIAL-FRAME:13:11:0:-1:512:512:12:66:230:307|t "
-C.RightButton = " |TInterface\\TUTORIALFRAME\\UI-TUTORIAL-FRAME:13:11:0:-1:512:512:12:66:333:410|t "
-
--- ---------------------------------------------------------------------------
--- Backdrop presets
--- ---------------------------------------------------------------------------
 C.Backdrops = {
 	window = {
 		bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
@@ -80,4 +54,11 @@ C.Backdrops = {
 		edgeSize = 16,
 		insets = { left = 4, right = 4, top = 4, bottom = 4 },
 	},
+}
+
+C.IconPositions = {
+	BOTTOMRIGHT = { anchor = "BOTTOMRIGHT", retailX = 15, classicX = 2, y = -6 },
+	TOPRIGHT = { anchor = "TOPRIGHT", retailX = 15, classicX = 2, y = 1 },
+	TOPLEFT = { anchor = "TOPLEFT", retailX = -1, classicX = -1, y = 1 },
+	BOTTOMLEFT = { anchor = "BOTTOMLEFT", retailX = -1, classicX = -1, y = -6 },
 }

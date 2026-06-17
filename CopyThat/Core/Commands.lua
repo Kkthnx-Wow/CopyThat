@@ -1,31 +1,27 @@
 --[[
 	CopyThat - Commands & Options
 	-------------------------------------------------------------------------
-	Slash commands (`/copythat`, `/ct`) and the Blizzard Settings panel.
+	/copythat slash command and Blizzard Settings panel (CharInspectPlus layout).
 --]]
 
 local _, ns = ...
 local F, C, L = ns.F, ns.C, ns.L
 
-local type = type
+local CreateFrame = CreateFrame
 local format = string.format
-local ipairs = ipairs
 local C_AddOns = C_AddOns
+local Settings = _G.Settings
 
 local function Brand(text)
 	return "|c" .. C.BrandHex .. text .. "|r"
 end
 
--- ---------------------------------------------------------------------------
--- Slash commands
--- ---------------------------------------------------------------------------
 local handlers = {}
 
 handlers.help = function(_)
 	F.Print(F.Colorize(L["Usage"] .. ":", "brand"))
-	F.Print("  /copythat", "-", L["Open the options panel"])
-	F.Print("  /ct", "-", L["Open the options panel"])
-	F.Print("  /copythat help", "-", L["Show this help"])
+	F.Print("  /copythat help   -", L["Show this help"])
+	F.Print("  /copythat config -", L["Open the options panel"])
 end
 
 handlers.config = function(_)
@@ -38,23 +34,16 @@ end
 
 local function HandleSlash(input)
 	input = (input or ""):gsub("^%s+", ""):gsub("%s+$", "")
-	local command = input:match("^(%S*)") or ""
+	local command, rest = input:match("^(%S*)%s*(.-)$")
 	command = command:lower()
-	if command == "" or command == "config" then
-		handlers.config()
-		return
-	end
-	local handler = handlers[command] or handlers.help
-	handler(input:match("^%S*%s*(.-)$"))
+	local handler = handlers[command] or handlers.config
+	handler(rest)
 end
 
 _G.SLASH_COPYTHAT1 = "/copythat"
 _G.SLASH_COPYTHAT2 = "/ct"
-_G["SlashCmdList"]["COPYTHAT"] = HandleSlash
+_G.SlashCmdList.COPYTHAT = HandleSlash
 
--- ---------------------------------------------------------------------------
--- Options panel
--- ---------------------------------------------------------------------------
 local function ApplyModuleSetting(module, key, value)
 	if module.OnSettingChanged then
 		module:OnSettingChanged(key, value)
@@ -82,6 +71,23 @@ local function RegisterSetting(category, module, key, name)
 	return setting
 end
 
+function OptionBuilder:Description(text)
+	local layout = self.layout
+	if layout and F.CreateSettingsDescription then
+		local desc = F.CreateSettingsDescription(text)
+		if desc then
+			layout:AddInitializer(desc)
+		end
+	end
+end
+
+function OptionBuilder:Header(text)
+	local layout = self.layout
+	if layout and _G.CreateSettingsListSectionHeaderInitializer then
+		layout:AddInitializer(_G.CreateSettingsListSectionHeaderInitializer(text))
+	end
+end
+
 function OptionBuilder:Checkbox(category, module, key, name, tooltip)
 	local setting = RegisterSetting(category, module, key, name)
 	Settings.CreateCheckbox(category, setting, tooltip)
@@ -102,7 +108,9 @@ function OptionBuilder:Dropdown(category, module, key, name, tooltip, choices)
 	if not Settings.CreateDropdown then
 		return
 	end
+
 	local setting = RegisterSetting(category, module, key, name)
+
 	local function GetOptions()
 		local container = Settings.CreateControlTextContainer()
 		for i = 1, #choices do
@@ -111,11 +119,14 @@ function OptionBuilder:Dropdown(category, module, key, name, tooltip, choices)
 		end
 		return container:GetData()
 	end
+
 	Settings.CreateDropdown(category, setting, GetOptions, tooltip)
 	return setting
 end
 
--- Landing page (canvas layout when available).
+-- ---------------------------------------------------------------------------
+-- Landing page (root category — shown when you click the addon name)
+-- ---------------------------------------------------------------------------
 local function MakeFontString(parent, template)
 	local fs = parent:CreateFontString(nil, "OVERLAY", template or "GameFontNormal")
 	fs:SetJustifyH("LEFT")
@@ -125,8 +136,13 @@ end
 local function CreateLandingFrame()
 	local frame = CreateFrame("Frame", nil)
 
+	local logo = frame:CreateTexture(nil, "ARTWORK")
+	logo:SetSize(64, 64)
+	logo:SetPoint("TOPLEFT", 14, -14)
+	logo:SetTexture(C_AddOns.GetAddOnMetadata(ns.name, "IconTexture") or 134331)
+
 	local title = MakeFontString(frame, "GameFontNormalHuge")
-	title:SetPoint("TOPLEFT", 14, -14)
+	title:SetPoint("TOPLEFT", logo, "TOPRIGHT", 14, -2)
 	title:SetText(ns.title)
 
 	local meta = MakeFontString(frame, "GameFontDisable")
@@ -134,11 +150,15 @@ local function CreateLandingFrame()
 	local author = C_AddOns.GetAddOnMetadata(ns.name, "Author") or "?"
 	meta:SetText(format("%s %s   %s %s", L["Version"], Brand(ns.version), L["Author"], Brand(author)))
 
+	local stats = MakeFontString(frame, "GameFontHighlight")
+	stats:SetPoint("TOPLEFT", meta, "BOTTOMLEFT", 0, -4)
+	frame.stats = stats
+
 	local tagline = MakeFontString(frame, "GameFontHighlight")
-	tagline:SetPoint("TOPLEFT", meta, "BOTTOMLEFT", 0, -16)
+	tagline:SetPoint("TOPLEFT", logo, "BOTTOMLEFT", 0, -16)
 	tagline:SetPoint("RIGHT", frame, "RIGHT", -24, 0)
 	tagline:SetWordWrap(true)
-	tagline:SetText(C_AddOns.GetAddOnMetadata(ns.name, "Notes") or "")
+	tagline:SetText(L["Landing Tagline"])
 
 	local divider = frame:CreateTexture(nil, "ARTWORK")
 	divider:SetColorTexture(C.Colors.brand[1], C.Colors.brand[2], C.Colors.brand[3], 0.55)
@@ -153,6 +173,7 @@ local function CreateLandingFrame()
 	local lines = {
 		{ "/copythat", L["Open the options panel"] },
 		{ "/ct", L["Open the options panel"] },
+		{ "/copythat help", L["Show this help"] },
 	}
 
 	local anchor = heading
@@ -163,65 +184,40 @@ local function CreateLandingFrame()
 		anchor = row
 	end
 
+	local hint = MakeFontString(frame, "GameFontDisable")
+	hint:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 6, -14)
+	hint:SetPoint("RIGHT", frame, "RIGHT", -24, 0)
+	hint:SetWordWrap(true)
+	hint:SetText(L["Landing Settings Hint"])
+
+	function frame:OnRefresh()
+		local total, enabled = #ns.modules, 0
+		for i = 1, total do
+			if ns.modules[i]:IsEnabled() then
+				enabled = enabled + 1
+			end
+		end
+		self.stats:SetFormattedText(L["%d modules, %d enabled"], total, enabled)
+	end
+
+	for i = 1, #ns.modules do
+		local module = ns.modules[i]
+		if module.dbKey then
+			ns:RegisterCallback("SettingChanged." .. module.dbKey .. ".enable", "OnRefresh", frame)
+		end
+	end
+	frame:OnRefresh()
+
 	return frame
 end
 
--- Canvas sub-pages (About, etc.).
-local canvasMixin = {}
-function canvasMixin:SetDefaultsHandler(callback)
-	local button = self:GetParent().Header.DefaultsButton
-	button:Show()
-	button:SetScript("OnClick", callback)
-end
-
-local function CreateCanvasSubFrame(name)
-	local frame = CreateFrame("Frame")
-
-	local header = CreateFrame("Frame", nil, frame)
-	header:SetPoint("TOPLEFT")
-	header:SetPoint("TOPRIGHT")
-	header:SetHeight(50)
-	frame.Header = header
-
-	local title = header:CreateFontString(nil, "ARTWORK", "GameFontHighlightHuge")
-	title:SetPoint("TOPLEFT", 7, -22)
-	title:SetJustifyH("LEFT")
-	title:SetText(name)
-	header.Title = title
-
-	local defaults = CreateFrame("Button", nil, header, "UIPanelButtonTemplate")
-	defaults:SetPoint("TOPRIGHT", -36, -16)
-	defaults:SetSize(96, 22)
-	defaults:SetText(_G["SETTINGS_DEFAULTS"] or DEFAULTS or "Defaults")
-	defaults:Hide()
-	header.DefaultsButton = defaults
-
-	local divider = header:CreateTexture(nil, "ARTWORK")
-	divider:SetPoint("TOP", 0, -50)
-	divider:SetAtlas("Options_HorizontalDivider", true)
-
-	local canvas = Mixin(CreateFrame("Frame", nil, frame), canvasMixin)
-	canvas:SetPoint("BOTTOMLEFT", 0, 5)
-	canvas:SetPoint("BOTTOMRIGHT", -12, 5)
-	canvas:SetPoint("TOP", 0, -56)
-
-	return frame, canvas
-end
-
-local optionsCanvases = {}
-
-function ns:RegisterOptionsCanvas(name, builder, sidebarLabel)
-	optionsCanvases[#optionsCanvases + 1] = {
-		name = name,
-		builder = builder,
-		sidebar = sidebarLabel or name,
-	}
-end
+local optionsBuilt = false
 
 local function BuildOptions()
-	if not (Settings and Settings.RegisterVerticalLayoutCategory) then
+	if optionsBuilt or not (Settings and Settings.RegisterVerticalLayoutCategory) then
 		return
 	end
+	optionsBuilt = true
 
 	local category
 	if Settings.RegisterCanvasLayoutCategory then
@@ -231,44 +227,37 @@ local function BuildOptions()
 	end
 	ns.settingsCategory = category
 
+	local subCategory, layout
+	if Settings.RegisterVerticalLayoutSubcategory then
+		subCategory, layout = Settings.RegisterVerticalLayoutSubcategory(category, L["General"])
+		ns.settingsSubCategory = subCategory
+	end
+
+	OptionBuilder.layout = layout
+	if layout then
+		OptionBuilder:Description(L["DESC_GENERAL"])
+	end
+
 	for i = 1, #ns.modules do
 		local module = ns.modules[i]
 		if module.RegisterOptions then
-			module:RegisterOptions(category, OptionBuilder)
-		end
-	end
-
-	if Settings.RegisterCanvasLayoutSubcategory then
-		table.sort(optionsCanvases, function(a, b)
-			return a.name < b.name
-		end)
-		local panel = _G["SettingsPanel"]
-		for i = 1, #optionsCanvases do
-			local entry = optionsCanvases[i]
-			local frame, canvas = CreateCanvasSubFrame(entry.name)
-			Settings.RegisterCanvasLayoutSubcategory(category, frame, entry.sidebar)
-			if panel and entry.builder then
-				local built = false
-				panel:HookScript("OnShow", function()
-					if not built then
-						built = true
-						entry.builder(canvas)
-					end
-				end)
-			elseif entry.builder then
-				entry.builder(canvas)
+			if layout then
+				OptionBuilder:Header(module.title or module.name)
 			end
+			module:RegisterOptions(subCategory or category, OptionBuilder)
 		end
 	end
+	OptionBuilder.layout = nil
 
 	Settings.RegisterAddOnCategory(category)
 
 	function ns:OpenOptions()
-		if Settings.OpenToCategory then
-			Settings.OpenToCategory(category.ID)
-		elseif _G["C_SettingsUtil"] and _G["C_SettingsUtil"].OpenSettingsPanel then
-			_G["C_SettingsUtil"].OpenSettingsPanel(category.ID)
+		local target = ns.settingsSubCategory or ns.settingsCategory
+		if Settings.OpenToCategory and target then
+			Settings.OpenToCategory(target.ID)
+			return true
 		end
+		return false
 	end
 end
 

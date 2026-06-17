@@ -1,15 +1,8 @@
 --[[
 	CopyThat - Engine
 	-------------------------------------------------------------------------
-	The engine owns the addon namespace, the module system, a single shared
-	event dispatcher and the load lifecycle. Every other file consumes the
-	namespace handed to it by WoW via `local addonName, ns = ...`.
-
-	Design goals (NexEnhance framework):
-	  * One global only (`_G.CopyThat`) - everything else lives on `ns`.
-	  * One event frame for the whole addon; modules subscribe through it
-	    instead of each creating their own frame and registering duplicates.
-	  * Clear lifecycle: OnInitialize (DB ready) -> OnEnable (world ready).
+	Owns the addon namespace, module registry, shared event dispatcher, and
+	load lifecycle. Pattern follows NexEnhance (one global, one event frame).
 --]]
 
 local addonName, ns = ...
@@ -20,10 +13,8 @@ local CreateFrame = CreateFrame
 local IsLoggedIn = IsLoggedIn
 local tinsert = table.insert
 local C_AddOns = C_AddOns
+local C_Timer = C_Timer
 
--- ---------------------------------------------------------------------------
--- Metadata
--- ---------------------------------------------------------------------------
 ns.name = addonName
 ns.title = C_AddOns.GetAddOnMetadata(addonName, "Title") or addonName
 ns.version = C_AddOns.GetAddOnMetadata(addonName, "Version") or "0.0.0"
@@ -36,9 +27,6 @@ ns.L = ns.L or setmetatable({}, {
 	end,
 })
 
--- ---------------------------------------------------------------------------
--- Module registry
--- ---------------------------------------------------------------------------
 local modules = {}
 local moduleByName = {}
 
@@ -57,18 +45,6 @@ function moduleMeta:RegisterEvent(event, handler)
 	ns:RegisterEvent(event, function(_, ...)
 		handler(self, ...)
 	end)
-end
-
-function moduleMeta:RegisterUnitEvent(event, handler, ...)
-	handler = handler or self[event]
-	if type(handler) == "string" then
-		handler = self[handler]
-	end
-	assert(type(handler) == "function", ("CopyThat: no handler for unit event '%s' on module '%s'"):format(event, self.name))
-
-	ns:RegisterUnitEvent(event, function(_, ...)
-		handler(self, ...)
-	end, ...)
 end
 
 function moduleMeta:IsEnabled()
@@ -100,9 +76,6 @@ function ns:GetModule(name)
 	return moduleByName[name]
 end
 
--- ---------------------------------------------------------------------------
--- Central event dispatcher
--- ---------------------------------------------------------------------------
 local eventFrame = CreateFrame("Frame", "CopyThatEventFrame")
 local eventCallbacks = {}
 
@@ -136,17 +109,6 @@ function ns:RegisterEvent(event, callback)
 	return callback
 end
 
-function ns:RegisterUnitEvent(event, callback, ...)
-	local callbacks = eventCallbacks[event]
-	if not callbacks then
-		callbacks = {}
-		eventCallbacks[event] = callbacks
-		eventFrame:RegisterUnitEvent(event, ...)
-	end
-	callbacks[#callbacks + 1] = callback
-	return callback
-end
-
 function ns:UnregisterEvent(event, callback)
 	local callbacks = eventCallbacks[event]
 	if not callbacks then
@@ -168,9 +130,6 @@ function ns:UnregisterEvent(event, callback)
 	end
 end
 
--- ---------------------------------------------------------------------------
--- Internal signal bus
--- ---------------------------------------------------------------------------
 local signalCallbacks = {}
 
 function ns:RegisterCallback(signal, callback, owner)
@@ -223,9 +182,6 @@ function ns:UnregisterCallback(signal, callback, owner)
 	end
 end
 
--- ---------------------------------------------------------------------------
--- Lifecycle
--- ---------------------------------------------------------------------------
 local initialized, enabled = false, false
 
 local function RunCallback(module, method)
@@ -253,6 +209,12 @@ local function Enable()
 	end
 end
 
+-- Step off PLAYER_LOGIN by one tick so chat frames exist before modules build UI.
+local function EnableDeferred()
+	C_Timer.After(0, Enable)
+end
+
+-- Late load (LoadOnDemand after login): PLAYER_LOGIN will not fire again.
 local function Initialize()
 	if initialized then
 		return
@@ -268,7 +230,7 @@ local function Initialize()
 	end
 
 	if IsLoggedIn() then
-		Enable()
+		EnableDeferred()
 	end
 end
 
@@ -282,4 +244,4 @@ onAddonLoaded = function(_, loadedAddon)
 end
 
 ns:RegisterEvent("ADDON_LOADED", onAddonLoaded)
-ns:RegisterEvent("PLAYER_LOGIN", Enable)
+ns:RegisterEvent("PLAYER_LOGIN", EnableDeferred)

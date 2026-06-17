@@ -1,21 +1,12 @@
 --[[
 	CopyThat - Database
 	-------------------------------------------------------------------------
-	Lightweight saved-variable manager with profile support.
-
-	Layout of `CopyThatDB`:
-	    {
-	        profiles    = { ["Default"] = { chatCopy = { ... } } },
-	        profileKeys = { ["Char - Realm"] = "Default" },
-	        global      = { ... account-wide data ... },
-	    }
-
-	Migration v1 upgrades the legacy flat Dashi-era `CopyThatDB` table
-	(iconAlpha, iconPosition, isEnabled at the root) into the profile layout.
+	Lightweight saved-variable manager with a single default profile. Migrates
+	legacy flat CopyThatDB keys from the Dashi era into the module layout.
 --]]
 
 local _, ns = ...
-local C, F = ns.C, ns.F
+local F = ns.F
 
 ns.defaults = {
 	profile = {},
@@ -27,60 +18,53 @@ function ns:RegisterDefaults(defaults, scope)
 	F.CopyDefaults(defaults, ns.defaults[scope])
 end
 
-local DB_SCHEMA_VERSION = 1
+local function MigrateLegacyFlatKeys(root)
+	if type(root.chatCopy) == "table" then
+		return
+	end
+	if root.isEnabled == nil and root.iconAlpha == nil and root.iconPosition == nil then
+		return
+	end
 
-local migrations = {
-	-- Dashi stored settings flat on CopyThatDB; fold them into chatCopy defaults.
-	[1] = function(root)
-		if root.profiles and root.profiles.Default and root.profiles.Default.chatCopy then
-			return
-		end
+	root.chatCopy = {
+		enable = root.isEnabled ~= false,
+		iconAlpha = root.iconAlpha or 0.5,
+		iconPosition = root.iconPosition or "BOTTOMRIGHT",
+	}
+	root.isEnabled = nil
+	root.iconAlpha = nil
+	root.iconPosition = nil
+end
 
-		local chatCopy = {}
-		if root.iconAlpha ~= nil then
-			chatCopy.iconAlpha = root.iconAlpha
+local function MigrateLegacyProfiles(root)
+	if root.profiles then
+		for _, profile in pairs(root.profiles) do
+			MigrateLegacyFlatKeys(profile)
 		end
-		if root.iconPosition ~= nil then
-			chatCopy.iconPosition = root.iconPosition
-		end
-		if root.isEnabled ~= nil then
-			chatCopy.enable = root.isEnabled
-		end
+		return
+	end
 
-		if next(chatCopy) then
-			root.profiles = root.profiles or {}
-			root.profiles.Default = root.profiles.Default or {}
-			root.profiles.Default.chatCopy = chatCopy
-		end
+	MigrateLegacyFlatKeys(root)
 
-		root.iconAlpha = nil
-		root.iconPosition = nil
-		root.isEnabled = nil
-	end,
-}
-
-local function MigrateDatabase(root)
-	local version = root.schemaVersion or 0
-	for v = version + 1, DB_SCHEMA_VERSION do
-		local step = migrations[v]
-		if step then
-			step(root)
+	root.profiles = { Default = {} }
+	for key, value in pairs(root) do
+		if key ~= "profiles" and key ~= "profileKeys" and key ~= "global" then
+			root.profiles.Default[key] = value
+			root[key] = nil
 		end
 	end
-	root.schemaVersion = DB_SCHEMA_VERSION
+	if not next(root.profiles.Default) then
+		root.profiles.Default = nil
+	end
 end
 
 function ns:SetProfile(profileName)
 	local root = _G.CopyThatDB
-	root.profileKeys[C.Player.key] = profileName
+	root.profileKeys[ns.C.Player.key] = profileName
 	root.profiles[profileName] = root.profiles[profileName] or {}
 
 	ns.db = F.CopyDefaults(ns.defaults.profile, root.profiles[profileName])
 	ns.profileName = profileName
-
-	if ns.OnProfileChanged then
-		ns:OnProfileChanged(profileName)
-	end
 end
 
 function ns:SetupDatabase()
@@ -90,10 +74,9 @@ function ns:SetupDatabase()
 	root.profileKeys = root.profileKeys or {}
 	root.global = F.CopyDefaults(ns.defaults.global, root.global)
 
-	MigrateDatabase(root)
+	MigrateLegacyProfiles(root)
 
+	local profileName = root.profileKeys[ns.C.Player.key] or "Default"
 	ns.global = root.global
-
-	local profileName = root.profileKeys[C.Player.key] or "Default"
 	ns:SetProfile(profileName)
 end

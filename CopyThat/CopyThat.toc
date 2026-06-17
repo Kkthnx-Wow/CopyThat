@@ -9,33 +9,19 @@
 ## X-Support: Midnight
 ## X-Curse-Project-ID: 657931
 
-## Category-enUS: Kkthnx's AddOns
-## Category-deDE: Kkthnx's AddOns
-## Category-esES: Kkthnx's AddOns
-## Category-esMX: Kkthnx's AddOns
-## Category-itIT: Kkthnx's AddOns
-## Category-frFR: Kkthnx's AddOns
-## Category-ptBR: Kkthnx's AddOns
-## Category-ruRU: Kkthnx's AddOns
-## Category-koKR: Kkthnx's AddOns
-## Category-zhCN: Kkthnx's AddOns
-## Category-zhTW: Kkthnx's AddOns
-
 # ----------------------------------------------------------------------------
-# Core engine. Order matters: namespace first, then DB-ready helpers.
+# Core engine (order matters).
 # ----------------------------------------------------------------------------
 Core\Engine.lua
 Core\Constants.lua
 Core\Functions.lua
+Core\Widgets.lua
+Core\Widgets.xml
 Core\Database.lua
-
-# Localization (English is the fallback and must load first).
 Core\Locales\enUS.lua
-
-# User-facing entry points (slash commands + options panel).
 Core\Commands.lua
 
 # ----------------------------------------------------------------------------
 # Modules
 # ----------------------------------------------------------------------------
-Modules\Chat\Copy.lua
+Modules\ChatCopy.lua
